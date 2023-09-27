@@ -16,7 +16,7 @@ var cookieParser = require('cookie-parser');
 
 var client_id = '20f93df69b53a38ff9954f5d336f3e20'; // Your app's client ID
 var client_secret = '8aa95068d533e8e4eea7dd57ec9add8e'; // Your app's secret
-var redirect_uri = 'http://localhost:3000'; // The URI you will send your user to after auth
+var redirect_uri = 'https://node-monday-o2xhehll4-nilesh-itabtechs-projects.vercel.app'; // The URI you will send your user to after auth
 var port = 3000;
 
 // initialize express server
