@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Monday App</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <style>
+    .iframe #overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .iframe #popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80vw;
+        height: 90vh;
+        background-color: white;
+        z-index: 1;
+    }
+    .iframe #popup_iframe {
+        width: 100%;
+        height: 100%;
+    }
+    .loader_latest {
+        display: none;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, .5);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 9999;
+    }
+
+    .loader_latest svg {
+        position: absolute;
+        z-index: 99999;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        shape-rendering: auto;
+        width: 50px;
+        height: 50px;
+    }
+    #message_custom_overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index:99;
+    }
+    #message_custom_popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 30vw;
+        height: 200px;
+        background-color: #fff;
+        color: #000;
+        z-index: 999;
+    }
+    .message_subject {
+        padding: 10px 20px;
+        background:#33589f;
+
+    }
+    .message_subject.error{
+        background: #d45659;
+    }
+    .message_subject.success{
+        background: #6ca162;
+    }
+    .message_custom_content {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        position: relative;
+    }
+    .message_title {
+        padding: 15px;
+    }
+    .message_custom_colse {
+        font-size: 30px;
+        font-weight: 600;
+        position: absolute;
+        right: 15px;
+        top: 0px;
+        cursor: pointer;
+        color: #FFf;
+    }
+    .message_subject h3 {
+        color: #fff;
+        margin: 0px;
+    }
+    .message_title p {
+        color: #000;
+        margin: 0;
+    }
+
+    #message_custom_popup.error {
+        height: 300px;
+    }
+    .message_custom_body{
+        overflow: hidden;
+        overflow-y: auto;
+        max-height: 258px;
+    }
+    
+    #contentSelectorFrame {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        min-height: calc(100vh - 50px);
+        border: none;
+    }
+    #logout{
+        display:none;
+    }
+    button#logout {
+        position: absolute;
+        right: 10px;
+        top: 15px;
+    }
+    .custom_iframe {
+        position: relative;
+    }
+   .loginContainer {
+        width: 365px;
+        margin: 0 auto;
+        padding-top: 20px;
+        display:none;
+    }
+    .loginForm button {
+        background-color: #04AA6D;
+        color: white;
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+    }
+    .loginForm  button:hover {
+        opacity: 0.8;
+    }
+   .loginContainer  .imgcontainer {
+        text-align: center;
+        margin: 24px 0 12px 0;
+    }
+    .loginContainer  svg {
+        width: 40%;
+        border-radius: 50%;
+    }
+    .loginContainer  input[type=text], input[type=password] {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+    } 
+  </style>
+  <script>
+let myWindow;
+const handleMessageEvent = (event) => {
+    //console.log(event);
+    var tenantUrl = localStorage.getItem("aprimo_tenant_url");
+    // Ensure only messages from the Aprimo Content Selector are handled.
+    if (event.origin !== tenantUrl) {
+        return;
+    }
+    if (event.data.result === 'cancel') {
+        alert('You have canceled the selector');
+    } else {
+        if(event.isTrusted === true){
+            if (myWindow !== null && myWindow !== undefined) {
+                myWindow.close();
+                openSelector();
+                localStorage.setItem("is_login_aprimo",'1');
+                var aprimoContentSelectorUrl = localStorage.getItem("aprimo_connected_url");
+                $("#contentSelectorFrame").attr("src",aprimoContentSelectorUrl);	
+                $(".loginContainer").hide();
+                $("#logout").show();
+               
+            }
+            if(event.data.selection){
+                const ids = event.data.selection?.map((selection) => selection.id);
+                console.log("id",ids);
+                const searchParams = new URLSearchParams(window.location.search);
+                console.log(window.location.search);
+                if(searchParams.has('boardId') && searchParams.has('itemId')){
+                    var boardId = searchParams.get('boardId');
+                    var itemId = searchParams.get('itemId');
+                    console.log(boardId);
+                    asset_detail(ids,boardId,itemId);
+                }  
+            }
+            
+        }	
+		
+    }
+};
+
+const openSelector = () => {
+    // Create an iframe and set its src to the Aprimo Content Selector URL
+    var aprimoContentSelectorUrl = localStorage.getItem("aprimo_connected_url");
+    
+    $("#contentSelectorFrame").attr("src",aprimoContentSelectorUrl);
+    $(".custom_iframe").show();
+
+    // Listen for messages from the iframe
+    window.addEventListener("message", handleMessageEvent, false);
+};
+
+
+const closeSelector = () => {
+    // Create an iframe and set its src to the Aprimo Content Selector URL
+    var aprimoContentSelectorUrl = localStorage.getItem("aprimo_connected_url");
+    $("#contentSelectorFrame").attr("src",aprimoContentSelectorUrl);
+    $(".custom_iframe").hide();
+
+    // Listen for messages from the iframe
+    window.addEventListener("message", handleMessageEvent, false);
+};
+
+
+function message_close(){
+    var overlay = document.getElementById("message_custom_overlay");
+    var popup = document.getElementById("message_custom_popup");
+
+    overlay.style.display = "none";
+    popup.style.display = "none";
+}
+
+function message_open(){
+    var overlay = document.getElementById("message_custom_overlay");
+    var popup = document.getElementById("message_custom_popup");
+
+    overlay.style.display = "block";
+    popup.style.display = "block";
+}
+
+function asset_detail(ids,boardId,itemId){
+    
+   if(ids != ""){
+		var iframe_src = $("#app-feature-iframe").attr("src");
+		console.log(iframe_src);
+		
+       //console.log(ids); return;
+       /*$(".loader_latest").show();
+        var app_access_token = "<?php echo $app_access_token; ?>";
+        $.ajax({
+            type: "POST",
+            url: "<?php echo base_url('add-file-attachment'); ?>",
+            data: {ids:ids,app_access_token:app_access_token,board_id:boardId,item_id:itemId},
+            dataType: 'json',
+            cache: false,
+            success: function(response){
+                $(".loader_latest").hide();
+                var result = JSON.parse(JSON.stringify(response));
+                if(result.status == 1){
+                    $(".message_subject").removeClass("error");
+                    $(".message_subject").addClass("success");
+                    $(".message_subject h3").text("Success"); 				
+                    $(".message_title p").text(result.message);
+                    message_open();
+                }else{
+                    $(".message_subject").removeClass("success");
+                    $(".message_subject").addClass("error");
+                    $(".message_subject h3").text("Error"); 				
+                    $(".message_title p").text(result.message);
+                    message_open();
+                }
+            }
+        });*/
+    }
+}
+
+function check_url(url){
+    if (url.includes('https') && url.includes('dam') && url.includes('aprim')) { 
+      return true;
+    }
+    return false;
+}
+    $(document).ready(function(){
+        $(".loader_latest").show();
+	setTimeout(function() {
+            var is_login_aprimo = localStorage.getItem("is_login_aprimo");
+            if(is_login_aprimo == '0' || is_login_aprimo == null || is_login_aprimo == undefined){
+                    closeSelector();
+                    $(".loginContainer").show();
+                    $("#logout").hide();
+            }else{
+                    openSelector();
+                    $(".loginContainer").hide();
+                    $("#logout").show();
+            }
+            $(".loader_latest").hide();
+            
+        }, 1000); 
+	
+	$("#logout").click(function(){
+            let mywin;
+            mywin = window.open("https://partner1.aprimo.com/login/connect/endsession", 'selector',"_self");
+            localStorage.setItem("is_login_aprimo",'0');
+            localStorage.setItem("aprimo_connected_url",'');
+            localStorage.setItem("aprimo_tenant_url",'');
+
+            setTimeout(function() {
+                    mywin.close();
+                    closeSelector();
+                    window.location.reload();
+            }, 5000);
+            
+           
+	});
+	
+	
+	$("#login").click(function(){
+            var txtUrl = $("#txtUrl").val();
+            if(txtUrl != ""){
+                if(check_url(txtUrl)){
+                    var is_login_aprimo = localStorage.getItem("is_login_aprimo");
+                    //localStorage.setItem("is_login_aprimo",'0');
+                    const selectorOptions = {
+                        title: 'Screenshot_2.png',
+                        // limitingSearchExpression: 'File.Version.FileType.Kind = png',
+                        accept: 'Use this logo',
+                        select: 'multiple'
+                    };
+
+                    const encodedOptions = window.btoa(JSON.stringify(selectorOptions));
+
+                    //const tenantUrl = 'https://partner1.dam.aprimo.com';
+                    const tenantUrl = txtUrl;
+                    const aprimoContentSelectorUrl = tenantUrl + '/dam/selectcontent#options=' + encodedOptions;
+
+                    localStorage.setItem("aprimo_connected_url",aprimoContentSelectorUrl);
+                    localStorage.setItem("aprimo_tenant_url",tenantUrl);
+                    myWindow = window.open(aprimoContentSelectorUrl, 'selector',"_self");
+                }else{
+                    $(".message_subject").removeClass("success");
+                    $(".message_subject").addClass("error");
+                    $(".message_subject h3").text("Error"); 				
+                    $(".message_title p").text("Please Enter Valid DAM Domain URL");
+                    message_open();
+                }    
+            }else{
+                $(".message_subject").removeClass("success");
+                $(".message_subject").addClass("error");
+                $(".message_subject h3").text("Error"); 				
+                $(".message_title p").text("Please Enter the portal domain");
+                message_open();
+            }
+	});
+        
+        
+        $(document).on("click", "#message_custom_overlay", function () {	
+            message_close();
+        });
+        $(document).on("click", ".message_custom_colse", function () {
+            message_close();
+        });
+    
+    });
+</script>
+</head>
+<body>
+    <div class="loader_latest">
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid"><circle cx="50" cy="50" fill="none" stroke="#fff" stroke-width="10" r="35" stroke-dasharray="164.93361431346415 56.97787143782138"><animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" values="0 50 50;360 50 50" keyTimes="0;1"></animateTransform></circle></svg>
+    </div>    
+    <div class="loginContainer">
+        <div class="imgcontainer">
+            <svg viewBox="0 -4 116 72" class="jss30 jss32"><rect id="backgroundrect" width="100%" height="100%" fill="none"></rect><g><g id="svg_1"><path fill="#00A5A5" d="M10.6 30.1c-2.9 0-10.6.2-10.6 6.1 0 3.5 2.9 5.4 6 5.4 4.2 0 5.6-3.5 5.6-3.5h.1s-.1.6-.1 1.4v1.7h3.1V30c0-4.5-2.5-6.9-6.9-6.9-4 0-6.5 2.1-6.5 2.1l1.4 2.5S4.9 26 7.6 26c2.2 0 3.8 1 3.8 3.9v.3h-.8zm.8 2.6v.6c0 2.6-1.8 5.6-4.7 5.6-2.2 0-3.3-1.4-3.3-2.8 0-3.2 4.6-3.3 7.1-3.3h.9z" id="svg_2"></path><path fill="#00A5A5" d="M22.9 40.2c0-.9-.1-1.5-.1-1.5h.1s1.5 2.9 5.4 2.9c4.6 0 7.9-3.6 7.9-9.2 0-5.5-3-9.2-7.7-9.2-4.4 0-5.9 3.2-5.9 3.2h-.1s.1-.6.1-1.3v-1.5h-3.1V48h3.4v-7.8zM27.8 26c2.9 0 5 2.5 5 6.3 0 4-2.3 6.3-5.1 6.3-3.2 0-5-3.1-5-6.3.1-4.4 2.5-6.3 5.1-6.3z" id="svg_3"></path><path fill="#00A5A5" d="M43.5 33.9c0-1.1.1-2.2.4-3.2.8-2.6 2.8-4.1 4.9-4.1.5 0 1 .1 1 .1v-3.3s-.4-.1-.9-.1c-2.7 0-4.7 2-5.5 4.6h-.1s.1-.6.1-1.3v-3.1h-3.3v17.6h3.4v-7.2z" id="svg_4"></path><path fill="#00A5A5" id="svg_5" d="M53.7 23.5h3.4v17.6h-3.4z"></path><linearGradient id="m_1" gradientUnits="userSpaceOnUse" x1="40.953" y1="56.434" x2="149.329" y2="91.425"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M65.5 27.1s.1-.6.1-1.3v-2.3h-3.3v17.6h3.4V33c0-.8 0-1.6.2-2.3.7-2.5 2.5-4.6 5-4.6 2.7 0 3 2.1 3 4.4v10.6h3.4V33c0-.9.1-1.7.2-2.4.6-2.4 2.5-4.5 4.9-4.5 2.6 0 3.1 2 3.1 4.4v10.6h3.4V29.8c0-4.5-1.8-6.8-5.8-6.8-2.8 0-5.3 1.9-6.2 4h-.1c-.6-2.6-2.3-4-5.3-4-2.7.1-5.1 2.1-6 4.1z" id="svg_6" fill="url(#m_1)"></path><linearGradient id="o_1" gradientUnits="userSpaceOnUse" x1="43.608" y1="48.21" x2="151.984" y2="83.201"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M92.7 32.3c0 5.4 4.2 9.3 9.5 9.3 5.2 0 9.5-3.9 9.5-9.3 0-5.3-4.2-9.2-9.5-9.2s-9.5 3.9-9.5 9.2zm9.4-6.3c3.3 0 6 2.6 6 6.3 0 3.7-2.7 6.3-6 6.3s-6-2.6-6-6.3c0-3.7 2.7-6.3 6-6.3z" id="svg_7" fill="url(#o_1)"></path><linearGradient id="tmt_1" gradientUnits="userSpaceOnUse" x1="46.849" y1="38.173" x2="155.225" y2="73.164"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path id="svg_8" fill="url(#tmt_1)" d="M112 25.7h.3v-2h.8v-.2h-1.9v.2h.8z"></path><linearGradient id="tmm_1" gradientUnits="userSpaceOnUse" x1="47.026" y1="37.625" x2="155.402" y2="72.617"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M113.8 24.3V24s.1.2.1.3l.5 1h.3l.5-1c.1-.1.1-.3.1-.3v.3l.1 1.4h.3l-.2-2.3h-.3l-.5 1.2c-.1.1-.1.3-.1.3s-.1-.2-.1-.3l-.5-1.2h-.3l-.2 2.3h.3v-1.4z" id="svg_9" fill="url(#tmm_1)"></path></g><g id="svg_10"><linearGradient id="dot1_1" gradientUnits="userSpaceOnUse" x1="89.79" y1="63.046" x2="134.294" y2="63.046"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M55.4 14.2c-1.2 0-2.2 1-2.2 2.2 0 1.2 1 2.2 2.2 2.2 1.2 0 2.2-1 2.2-2.2 0-1.2-1-2.2-2.2-2.2z" id="svg_11" fill="url(#dot1_1)"></path><linearGradient id="dot2_1" gradientUnits="userSpaceOnUse" x1="89.79" y1="55.933" x2="134.294" y2="55.933"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M62.6 5.9c-1.9 0-3.4 1.5-3.4 3.4s1.5 3.4 3.4 3.4S66 11.2 66 9.3s-1.5-3.4-3.4-3.4z" id="svg_12" fill="url(#dot2_1)"></path><linearGradient id="dot3_1" gradientUnits="userSpaceOnUse" x1="89.79" y1="51.574" x2="134.294" y2="51.574"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M75 0c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.3-5-5-5z" id="svg_13" fill="url(#dot3_1)"></path><linearGradient id="dot4_1" gradientUnits="userSpaceOnUse" x1="89.79" y1="56.354" x2="134.294" y2="56.354"><stop offset="0.045" stop-color="#00A5A5"></stop><stop offset="1" stop-color="#65b32e"></stop></linearGradient><path d="M91.7 3.5c-3.5 0-6.3 2.8-6.3 6.3s2.8 6.3 6.3 6.3S98 13.3 98 9.8s-2.9-6.3-6.3-6.3z" id="svg_14" fill="url(#dot4_1)"></path></g></g></svg>
+        </div>
+        <div class="loginForm">
+            <label for="txtUrl"><b>Enter the DAM domain</b></label>
+            <input type="text" name="txtUrl" id="txtUrl" />
+            <button id="login">Connect</button>
+        </div>
+    </div>
+    <div class="custom_iframe">
+        <button id="logout">Logout</button>
+        <iframe id="contentSelectorFrame"></iframe>
+    </div>
+    <div class="message">
+        <div id="message_custom_overlay"></div>
+        <div id="message_custom_popup">
+            <div class="message_custom_content">
+                <div class="message_custom_colse">×</div>
+                <div class="message_subject">
+                    <h3>Error</h3>
+                </div>
+                <div class="message_custom_body">
+                    <div class="message_title"><p>Error</p></div>                  
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
